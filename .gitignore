@@ -73,3 +73,7 @@ typings/
 .serverless
 
 # Custom
+*.byaml
+*.byml
+*.sarc
+*.szs

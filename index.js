@@ -11,12 +11,13 @@ ready();
 
 function ready() {
 	const decompressed = Yaz0.decompress(fs.readFileSync(`${SMO_ASSETS_PATH}/StageData/${SMO_STAGES[0]}`));
-	
 	const Stage = new SARCArchive(decompressed);
 	const files = Stage.files;
 
-	const yaml = new Byaml(files[0].data);
-	console.log(yaml);
+	console.log(files[1].name);
+
+	const yaml = new Byaml(files[1].data);
+	console.log(yaml.root);
 }
 
 function getStages() {

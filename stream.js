@@ -59,7 +59,7 @@ class Stream {
 		return this.read(4).readUInt32BE();
 	}
 
-	string(len=1, encoding='utf8') {
+	String(len=1, encoding='utf8') {
 		return this.bytes(len).toString(encoding);
 	}
 }

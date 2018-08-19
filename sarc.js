@@ -142,7 +142,7 @@ class SARCArchive {
 
 		for (const node of this.nodes) {
 			const file = {
-				data: data_content.subarray(node.data_start, node.size)
+				data: data_content.subarray(node.data_start, node.data_end)
 			};
 
 			if (node.has_name) {
