@@ -58,7 +58,7 @@ class Byaml {
 		this.version = struct.unpack(`${this.bom}H`, header_buffer.subarray(0x02, 0x04))[0];
 		this.node_name_table_offset = struct.unpack(`${this.bom}I`, header_buffer.subarray(0x04, 0x08))[0];
 		this.string_value_table_offset = struct.unpack(`${this.bom}I`, header_buffer.subarray(0x08, 0x0C))[0];
-		this.root_offset = struct.unpack(`${this.bom}I`, header_buffer.subarray(0x0C, 0x10))[0];
+		this.root_offset = struct.unpack(`${this.bom}I`, header_buffer.subarray(0x0C))[0];
 
 		if (!this.root_offset) {
 			return {};
@@ -81,39 +81,81 @@ class Byaml {
 			throw new Error(`Invalid root type. Expected either ${NODE_TYPES.ARRAY} or ${NODE_TYPES.DICTIONARY}. Got ${root_type}`);
 		}
 
-		return this.parse_node(root_type, this.root_offset);
+		return this.parse_node(root_type, 0x0C);
 	}
 
 	parse_node(type, offset) {
-		//console.log(type.toString(16));
+		const obj = {
+			type: type
+		};
+		
 		switch (type) {
 			case NODE_TYPES.STRING:
-				return this.parse_string(offset);
-			case NODE_TYPES.PATH:
-				return this.parse_path(offset);
+				obj.node_type_name = 'string';
+				
+				offset = struct.unpack(`${this.bom}I`, this.data.subarray(offset))[0];
+				obj.value = this.string_value_table[offset];
+				break;
 			case NODE_TYPES.ARRAY:
-				return this.parse_array(offset);
+				obj.node_type_name = 'array';
+				
+				offset = struct.unpack(`${this.bom}I`, this.data.subarray(offset))[0];
+				obj.value = this.parse_array(offset);
+				break;
 			case NODE_TYPES.DICTIONARY:
-				return this.parse_dictionary(offset);
+				obj.node_type_name = 'dictionary';
+				
+				offset = struct.unpack(`${this.bom}I`, this.data.subarray(offset))[0];
+				obj.value = this.parse_dictionary(offset);
+				break;
 			case NODE_TYPES.STRING_TABLE:
-				return this.parse_string_table(offset);
+				obj.node_type_name = 'string_table';
+				obj.value = this.parse_string_table(offset);
+				break;
 			case NODE_TYPES.BOOL:
-				return this.parse_bool(offset);
+				obj.node_type_name = 'bool';
+				obj.value = Boolean(this.data[offset]);
+				break;
 			case NODE_TYPES.INT:
-				return this.parse_int(offset);
+				obj.node_type_name = 'int';
+				obj.value = struct.unpack(`${this.bom}i`, this.data.subarray(offset))[0];
+				break;
 			case NODE_TYPES.FLOAT:
-				return this.parse_float(offset);
+				obj.node_type_name = 'float';
+				obj.value = struct.unpack(`${this.bom}f`, this.data.subarray(offset))[0];
+				break;
 			case NODE_TYPES.UINT:
-				return this.parse_uint(offset);
+				obj.node_type_name = 'uint';
+				obj.value = struct.unpack(`${this.bom}I`, this.data.subarray(offset))[0];
+				break;
 			case NODE_TYPES.INT64:
-				return this.parse_int64(offset);
+				obj.node_type_name = 'int64';
+				
+				offset = struct.unpack(`${this.bom}I`, this.data.subarray(offset))[0];
+				obj.value = struct.unpack(`${this.bom}q`, this.data.subarray(offset))[0];
+				break;
 			case NODE_TYPES.UINT64:
-				return this.parse_uint64(offset);
+				obj.node_type_name = 'uint64';
+				
+				offset = struct.unpack(`${this.bom}I`, this.data.subarray(offset))[0];
+				obj.value = struct.unpack(`${this.bom}Q`, this.data.subarray(offset))[0];
+				break;
 			case NODE_TYPES.DOUBLE:
-				return this.parse_double(offset);
+				obj.node_type_name = 'double';
+				
+				offset = struct.unpack(`${this.bom}I`, this.data.subarray(offset))[0];
+				obj.value = struct.unpack(`${this.bom}d`, this.data.subarray(offset))[0];
+				break;
+			case NODE_TYPES.NULL:
+				obj.node_type_name = 'null';
+				obj.value = null;
+				break;
+			case NODE_TYPES.PATH: // PATH seems unused in v3?
 			default:
 				throw new Error(`Unknown node type ${type}`);
 		}
+
+		return obj;
 	}
 
 	parse_string(offset) {
@@ -121,7 +163,7 @@ class Byaml {
 		return this.data.subarray(offset, offset + string_end).toString();
 	}
 
-	parse_path(offset) {}
+	//parse_path(offset) {}
 
 	parse_array(offset) {
 		const array = [];
@@ -149,18 +191,17 @@ class Byaml {
 			be: this.be
 		}, 0);
 
-		const dictionary_data = this.data.subarray(offset + 3, offset + 3 + (dictionary_size * 8));
-
 		for (let i = 0; i < dictionary_size; i++) {
-			const dictionary_data_offset = 8 * i;
-			const dictionary_entry = dictionary_data.subarray(dictionary_data_offset, dictionary_data_offset + 8);
-			const name_index = byteData.unpack(dictionary_entry.subarray(0, 3), {
+			const entry_offset = offset + 4 + (8 * i);
+			const name_index = byteData.unpack(this.data.subarray(entry_offset), {
 				bits: 24,
 				signed: false,
 				be: this.be
 			}, 0);
+			const name = this.node_name_table[name_index];
+			const node_type = this.data[entry_offset + 3];
 
-			console.log(name_index); // kill me
+			dictionary[name] = this.parse_node(node_type, entry_offset + 4);
 		}
 
 		return dictionary;
@@ -186,20 +227,6 @@ class Byaml {
 
 		return table;
 	}
-
-	parse_bool(offset) {}
-
-	parse_int(offset) {}
-
-	parse_float(offset) {}
-
-	parse_uint(offset) {}
-
-	parse_int64(offset) {}
-
-	parse_uint64(offset) {}
-
-	parse_double(offset) {}
 }
 
 module.exports = Byaml;
