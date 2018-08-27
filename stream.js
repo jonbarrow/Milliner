@@ -1,11 +1,19 @@
 class Stream {
 	constructor(buffer) {
 		this.pos = 0;
-		this.buffer = buffer;
+		this.data = buffer;
+	}
+
+	seek(pos) {
+		this.pos = pos;
+	}
+
+	skip(len) {
+		this.pos += len;
 	}
 
 	read(len) {
-		const read = this.buffer.subarray(this.pos, this.pos + len);
+		const read = this.data.subarray(this.pos, this.pos + len);
 		this.pos += len;
 
 		return read;
